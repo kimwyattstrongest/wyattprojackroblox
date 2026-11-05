@@ -9,25 +9,25 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
 -- Configuration
-local LOCKED_PART = "Head" -- ส่วนที่ต้องการล็อก เช่น "Head" (หัว) หรือ "HumanoidRootPart" (ลำตัว)
+local LOCKED_PART = "HumanoidRootPart" -- เปลี่ยนเป็นล็อกลำตัวเพื่อความชัวร์ (หรือใช้ "Head")
+local FOV_RADIUS = 500 -- ขยายรัศมีการค้นหาจากเมาส์ให้กว้างขึ้น
 local isLocked = false
 
--- ฟังก์ชันค้นหาผู้เล่นที่ใกล้เคียงกับตำแหน่งเมาส์มากที่สุดภายในระยะ FOV
+-- ฟังก์ชันค้นหาเป้าหมายที่ใกล้เมาส์ที่สุด
 local function getClosestPlayer()
 	local closestPlayer = nil
 	local shortestDistance = math.huge
 	local mousePos = UserInputService:GetMouseLocation()
 
 	for _, player in ipairs(Players:GetPlayers()) do
+		-- ไม่ล็อกตัวเอง และตรวจสอบว่าตัวละครยังมีชีวิตอยู่
 		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-			local targetPart = player.Character:FindFirstChild(LOCKED_PART)
+			local targetPart = player.Character:FindFirstChild(LOCKED_PART) or player.Character:FindFirstChild("Head")
 			if targetPart then
-				-- เช็คว่าตัวละครเป้าหมายมองเห็นได้ (ไม่อยู่หลังกำแพงทึบเกินไป หรือเช็คระยะหน้าจอ)
 				local screenPoint, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
 				if onScreen then
 					local distance = (Vector2.new(mousePos.X, mousePos.Y) - Vector2.new(screenPoint.X, screenPoint.Y)).Magnitude
-					-- กำหนดระยะห่างสูงสุดจากเมาส์ (เช่น รัศมี 200 พิกเซล) เพื่อป้องกันการล็อกมั่ว
-					if distance < 200 and distance < shortestDistance then
+					if distance < FOV_RADIUS and distance < shortestDistance then
 						shortestDistance = distance
 						closestPlayer = player
 					end
@@ -39,7 +39,7 @@ local function getClosestPlayer()
 	return closestPlayer
 end
 
--- ตรวจจับการกดคลิกขวา (MouseButton2)
+-- ตรวจจับการกดคลิกขวา
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		isLocked = true
@@ -52,14 +52,15 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
 	end
 end)
 
--- ลูปการทำงานหลักในการหันมุมกล้องไปที่เป้าหมาย
+-- ลูปบังคับหันกล้อง
 RunService.RenderStepped:Connect(function()
 	if isLocked then
 		local targetPlayer = getClosestPlayer()
-		if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild(LOCKED_PART) then
-			local targetPart = targetPlayer.Character[LOCKED_PART]
-			-- บังคับให้กล้องหันไปที่ตำแหน่งเป้าหมายทันที
-			Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
+		if targetPlayer and targetPlayer.Character then
+			local targetPart = targetPlayer.Character:FindFirstChild(LOCKED_PART) or targetPlayer.Character:FindFirstChild("Head")
+			if targetPart then
+				Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
+			end
 		end
 	end
 end)
